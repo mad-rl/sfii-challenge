@@ -4,6 +4,23 @@ from .actuator import Actuator
 from .experiences import Experiences
 
 
+"""
+Default agent parameters:
+
+    'frames': 16,
+    'cnn_channels': 32,
+    'n_outputs': 49,
+    'screen_height': 256,
+    'screen_width': 200,
+    'width': 80,
+    'height': 80,
+    'start_from_model': "models/sf2_a3c.pth",
+    'module': "src.environments.gym_retro.my_agent.agent",
+    "class": "Agent"
+    
+"""
+
+
 class Agent():
     def __init__(self, parameters):
         self.action_space = parameters['n_outputs']
