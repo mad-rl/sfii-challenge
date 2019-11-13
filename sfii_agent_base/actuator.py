@@ -2,16 +2,16 @@ import numpy as np
 
 
 ACTIONS_MAP = {
-     0: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-     1: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
-     2: [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
-     3: [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-     4: [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
-     5: [0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0],
-     6: [0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0],
-     7: [0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
-     8: [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
-     9: [0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+    0: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    1: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+    2: [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+    3: [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+    4: [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+    5: [0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0],
+    6: [0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0],
+    7: [0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+    8: [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+    9: [0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
     10: [0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
     11: [0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0],
     12: [0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0],
@@ -55,18 +55,18 @@ ACTIONS_MAP = {
 
 ACTIONS_LABELS = [
     'NOTHING', 'UP', 'DOWN', 'LEFT', 'RIGHT', 'UP/RIGHT', 'UP/LEFT',
-    'UP + A', 'DOWN + A', 'LEFT + A', 'RIGHT + A', 'UP/RIGHT + A', 'UP/LEFT + A',
-    'UP + B', 'DOWN + B', 'LEFT + B', 'RIGHT + B', 'UP/RIGHT + B', 'UP/LEFT + B',
-    'UP + C', 'DOWN + C', 'LEFT + C', 'RIGHT + C', 'UP/RIGHT + C', 'UP/LEFT + C',
-    'UP + Y', 'DOWN + Y', 'LEFT + Y', 'RIGHT + Y', 'UP/RIGHT + Y', 'UP/LEFT + Y',
-    'UP + X', 'DOWN + X', 'LEFT + X', 'RIGHT + X', 'UP/RIGHT + X', 'UP/LEFT + X',
-    'UP + Z', 'DOWN + Z', 'LEFT + Z', 'RIGHT + Z', 'UP/RIGHT + Z', 'UP/LEFT + Z',
-    'A', 'B', 'C', 'Y', 'X', 'Z'
+    'UP + A', 'DOWN + A', 'LEFT + A', 'RIGHT + A', 'UP/RIGHT + A',
+    'UP/LEFT + A', 'UP + B', 'DOWN + B', 'LEFT + B', 'RIGHT + B',
+    'UP/RIGHT + B', 'UP/LEFT + B', 'UP + C', 'DOWN + C', 'LEFT + C',
+    'RIGHT + C', 'UP/RIGHT + C', 'UP/LEFT + C', 'UP + Y', 'DOWN + Y',
+    'LEFT + Y', 'RIGHT + Y', 'UP/RIGHT + Y', 'UP/LEFT + Y', 'UP + X',
+    'DOWN + X', 'LEFT + X', 'RIGHT + X', 'UP/RIGHT + X', 'UP/LEFT + X',
+    'UP + Z', 'DOWN + Z', 'LEFT + Z', 'RIGHT + Z', 'UP/RIGHT + Z',
+    'UP/LEFT + Z', 'A', 'B', 'C', 'Y', 'X', 'Z'
 ]
 
 
 class Actuator():
-    
     def __init__(self):
         self.action = 0
 

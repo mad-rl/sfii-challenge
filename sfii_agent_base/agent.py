@@ -1,20 +1,19 @@
-import numpy as np
-
 from .knowledge import Knowledge
 from .interpreter import Interpreter
 from .actuator import Actuator
 from .experiences import Experiences
 
-class Agent():
 
-    def __init__(self, action_space=None):
-        if action_space is None:
-            self.action_space = 49
-        else:
-            self.action_space = action_space
-        self.input_frames = 16
+class Agent():
+    def __init__(self, parameters):
+        self.action_space = parameters['n_outputs']
+        self.input_frames = parameters['frames']
+        self.width = parameters['width']
+        self.height = parameters['height']
+
         self.knowledge = Knowledge(self.input_frames, self.action_space)
-        self.interpreter = Interpreter(frames=self.input_frames, width=80, height=80)
+        self.interpreter = Interpreter(
+            frames=self.input_frames, width=self.width, height=self.height)
         self.actuator = Actuator()
         self.experiences = Experiences()
 
@@ -22,24 +21,37 @@ class Agent():
         self.max_reward = 0
         self.rewards = []
 
-    def get_action(self, observation):
-        state = self.interpreter.obs_to_state(observation)
-        agent_action = self.knowledge.get_action( state )
-        return self.actuator.agent_to_env(agent_action)
+    def load_model(self, model):
+        self.knowledge.model.load_state_dict(model.state_dict())
 
-    def calculate_reward(self, player_health, enemy_health):
+    def get_model(self):
+        return self.knowledge.get_model()
+
+    def initialize_optimizer(self, shared_agent):
+        self.knowledge.initialize_optimizer(shared_agent)
+
+    def get_state(self, state, observation):
+        new_state = self.interpreter.obs_to_state(state, observation)
+
+        return new_state
+
+    def get_action(self, state):
+        action, value = self.knowledge.get_action(state)
+
+        return self.actuator.agent_to_env(action), value
+
+    def calculate_reward(self, player_health, enemy_health, life_value=176):
         health_gap = player_health - enemy_health
-        reward = float(health_gap / 176)
+        reward = float(health_gap / life_value)
 
         return reward
 
-    def add_experience(self, observation, reward, env_action, next_observation, info=None):
-        state = self.interpreter.obs_to_state(observation)
-        reward_by_health = self.calculate_reward(info['health'], info['enemy_health'])
+    def add_experience(self, state, env_action, reward, next_state, info=None):
+        reward_by_health = self.calculate_reward(
+            info['health'], info['enemy_health'])
         agent_action = self.actuator.env_to_agent(env_action)
-        next_state = self.interpreter.obs_to_state(next_observation)
 
-        self.experiences.add(state, reward, agent_action, next_state)
+        self.experiences.add(state, agent_action, reward_by_health, next_state)
         self.rewards.append(reward)
 
     def start_step(self, current_step):
@@ -48,21 +60,14 @@ class Agent():
     def end_step(self, current_step):
         self.episode_steps = self.episode_steps + 1
         self.total_steps = self.total_steps + 1
-        pass
 
     def start_episode(self, current_episode):
         self.episode_steps = 0
-        pass
 
     def end_episode(self, current_episode):
-        episode_reward = np.sum(np.array(self.rewards))
-        if episode_reward > self.max_reward:
-            self.max_reward = episode_reward
-        print("Episode:", current_episode, ", episode_reward:", episode_reward,
-              ", max_reward:", self.max_reward, ", episode_steps:", self.episode_steps,
-              ", total_steps:", self.total_steps)
         self.rewards = []
-    
-    def train(self):
-        self.knowledge.train(self.experiences.get())
+
+    def train(self, game_finished, shared_agent):
+        self.knowledge.train(
+            self.experiences.get(), game_finished, shared_agent)
         self.experiences.reset()
