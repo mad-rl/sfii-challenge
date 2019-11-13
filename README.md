@@ -4,21 +4,25 @@ MAD_RL_ SFII Challenge
 
 - ROM name = `'Street Fighter II' - Special Champion Edition (USA).md`
 
-- SFII Challenge Engine docker name = `madrl/sfii-challenge-engine:v0.3.1`
-
-- Agent base model = A3C 
+- Agent base model = Asynchronous Advantage Actor-Critic (A3C)  
 
 
 ## How to test it
 
+1. Download SFII Challenge Engine docker:
 ```
-docker run -v $PWD/roms:/roms/ -v $PWD/models/:/models/ -v $PWD/:/requirements -v $PWD/sfii_agent_base/:/sfii_agent_base/ -e AGENT_MODULE=sfii_agent_base.agent madrl/sfii-challenge-engine:v0.3.1
+docker pull madrl/sfii-challenge-engine:0.3.2
+```
+
+2. Execute agent with the engine docker:
+```
+docker run -v $PWD/roms:/roms/ -v $PWD/models/:/models/ -v $PWD/:/requirements -v $PWD/sfii_agent_base/:/sfii_agent_base/ -e AGENT_MODULE=sfii_agent_base.agent madrl/sfii-challenge-engine:0.3.2
 ```
 
 
 ## How to play with your agent
 
-You can modify some parameters using environment variables
+You can modify some parameters using environment variables:
 
 
 ```
@@ -33,7 +37,7 @@ ENGINE_PARAMETERS
     "ENGINE_CLASS" = "Engine"
 ```
 
-Default agent parameters that you can modify inside the agent.py
+Default agent parameters that you can modify inside the agent.py:
 
 ```
 AGENT_PARAMETERS
