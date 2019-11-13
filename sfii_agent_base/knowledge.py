@@ -3,18 +3,43 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.distributions.categorical import Categorical
+
+from torch.autograd import Variable
 
 
 class ActorCritic(torch.nn.Module):
-    def __init__(self, num_inputs=4, num_outputs=4):
+    def __init__(self, num_inputs, num_outputs=6):
         super(ActorCritic, self).__init__()
 
         self.model_structure(num_inputs, num_outputs)
+        self.initialize_weights_and_biases()
+
         self.train()
 
-    def model_structure(self, num_inputs, num_outputs):
-        self.conv1 = nn.Conv2d(num_inputs, 32, kernel_size=2, stride=2, padding=1)
+    def normalized_columns_initializer(self, weights, std=1.0):
+        out = torch.randn(weights.size())
+        out *= std / torch.sqrt(out.pow(2).sum(1, keepdim=True))
+        return out
+
+    def weights_init(self, m):
+        classname = m.__class__.__name__
+        if classname.find('Conv') != -1:
+            weight_shape = list(m.weight.data.size())
+            fan_in = np.prod(weight_shape[1:4])
+            fan_out = np.prod(weight_shape[2:4]) * weight_shape[0]
+            w_bound = np.sqrt(6. / (fan_in + fan_out))
+            m.weight.data.uniform_(-w_bound, w_bound)
+            m.bias.data.fill_(0)
+        elif classname.find('Linear') != -1:
+            weight_shape = list(m.weight.data.size())
+            fan_in = weight_shape[1]
+            fan_out = weight_shape[0]
+            w_bound = np.sqrt(6. / (fan_in + fan_out))
+            m.weight.data.uniform_(-w_bound, w_bound)
+            m.bias.data.fill_(0)
+
+    def model_structure(self, n_inp, n_out):
+        self.conv1 = nn.Conv2d(n_inp, 32, kernel_size=2, stride=2, padding=1)
         self.conv2 = nn.Conv2d(32, 32, kernel_size=2, stride=2, padding=1)
         self.conv3 = nn.Conv2d(32, 32, kernel_size=2, stride=2, padding=1)
         self.conv4 = nn.Conv2d(32, 32, kernel_size=2, stride=2, padding=1)
@@ -24,8 +49,17 @@ class ActorCritic(torch.nn.Module):
 
         self.fc1 = nn.Linear(512, 120)
 
-        self.value = nn.Linear(120, 1)
-        self.policy = nn.Linear(120, num_outputs)
+        self.critic_linear = nn.Linear(120, 1)
+        self.actor_linear = nn.Linear(120, n_out)
+
+    def initialize_weights_and_biases(self):
+        self.apply(self.weights_init)
+        self.actor_linear.weight.data = self.normalized_columns_initializer(
+            self.actor_linear.weight.data, 0.01)
+        self.actor_linear.bias.data.fill_(0)
+        self.critic_linear.weight.data = self.normalized_columns_initializer(
+            self.critic_linear.weight.data, 1.0)
+        self.critic_linear.bias.data.fill_(0)
 
     def forward(self, inputs):
         x = self.relu(self.conv1(inputs))
@@ -38,62 +72,96 @@ class ActorCritic(torch.nn.Module):
 
         x = self.relu(self.fc1(x))
 
-        return self.policy(x), self.value(x)
+        return self.critic_linear(x), self.actor_linear(x)
 
 
 class Knowledge():
     def __init__(self, input_frames, action_space):
-        self.input_frames = input_frames
-        self.action_space = action_space
-        self.model = ActorCritic(self.input_frames, self.action_space)
-        self.model.double()
+        self.GAMMA = 0.9
+        self.TAU = 1.0
+        self.ENTROPY_COEF = 0.01
+        self.VALUE_LOSS_COEF = 0.5
 
-        self.gamma = 0.9
-        self.tau = 1.0
-        self.entropy_coef = 0.01
-        self.value_loss_coef = 0.5
-        self.learning_rate = 0.00001
+        self.model = ActorCritic(input_frames, num_outputs=action_space)
+        self.optimizer = None
 
+    def ensure_shared_grads(self, model, shared_model):
+        for param, shared_param in zip(model.parameters(),
+                                       shared_model.parameters()):
+            if shared_param.grad is not None:
+                return
+            shared_param._grad = param.grad
+
+    def initialize_optimizer(self, shared_agent):
         self.optimizer = optim.Adam(
-            self.model.parameters(), lr=self.learning_rate
-        )
-        self.model = self.model.to('cpu')
+            shared_agent.get_model().parameters(), lr=0.00001)
+
+    def get_model(self):
+        return self.model
+
+    def load_model(self, model):
+        self.model.load_state_dict(model.state_dict())
+
+    def load_model_from_path(self, model_path):
+        self.model.load_state_dict(torch.load(model_path))
 
     def get_action(self, state):
-        policy, _ = self.model(torch.tensor(state).unsqueeze(0))
-        action = F.softmax(policy, -1).multinomial(num_samples=1)
-        return action
+        value, logit = self.model(torch.FloatTensor(state).unsqueeze(0))
+        prob = F.softmax(logit, -1)
+        action = prob.multinomial(num_samples=1)
 
-    def train(self, experiences):
-        states  = torch.tensor(experiences[:, 0].tolist()).double()
-        rewards = torch.tensor(experiences[:, 1].tolist()).double()
-        actions = torch.tensor(experiences[:, 2].tolist()).long()
-        next_states = torch.tensor(experiences[:, 3].tolist()).double()
+        return action, value
 
-        logits, values = self.model(states)
-        probs     = F.softmax(logits, -1)
-        log_probs = F.log_softmax(logits, -1)
-        entropies = -(log_probs * probs).sum(1, keepdim=True)
-        log_probs = log_probs.gather(1, actions.unsqueeze(1))
+    def train(self, experiences, game_finished, shared_agent):
+        first_state = experiences[0, 0]
+        n_experiences = len(experiences)
 
-        _, value = self.model(next_states[-1].unsqueeze(0))
-        values = torch.cat((values, value.data))
+        value, logit = self.model(torch.FloatTensor(first_state).unsqueeze(0))
+        prob = F.softmax(logit, -1)
+        log_prob = F.log_softmax(logit, -1)
+        entropy = -(log_prob * prob).sum(1, keepdim=True)
 
+        action = prob.multinomial(num_samples=1)
+        log_prob = log_prob.gather(1, Variable(action))
+
+        rewards = experiences[:, 2]
+        entropies = list(
+            entropy.view(-1).repeat(n_experiences).detach().numpy())
+        log_probs = list(
+            log_prob.view(-1).repeat(n_experiences).detach().numpy())
+
+        values = []
+        for i in range(n_experiences):
+            values.append(value)
+
+        # Check the final value
+        final_state = experiences[0, -1]
+        R = torch.zeros(1, 1)
+        if not game_finished:
+            value, _ = self.model(torch.FloatTensor(final_state).unsqueeze(0))
+            R = value
+
+        values.append(Variable(R))
         policy_loss = 0
         value_loss = 0
-        R = values[-1]
+        R = Variable(R)
         gae = torch.zeros(1, 1)
         for i in reversed(range(len(rewards))):
-            R = self.gamma * R + rewards[i]
+            R = self.GAMMA * R + rewards[i]
             advantage = R - values[i]
             value_loss = value_loss + 0.5 * advantage.pow(2)
 
             # Generalized Advantage Estimation
-            delta_t = rewards[i] + self.gamma * values[i + 1].data - values[i].data
-            gae = gae.double() * self.gamma * self.tau + delta_t
-            policy_loss = policy_loss - (log_probs[i] * gae) - (self.entropy_coef * entropies[i])
+            delta_t = (
+                rewards[i] + self.GAMMA * values[i + 1].data - values[i].data)
+            gae = gae * self.GAMMA * self.TAU + delta_t
+            policy_loss = (
+                policy_loss - (log_probs[i] * Variable(gae)) -
+                (self.ENTROPY_COEF * entropies[i]))
 
         self.optimizer.zero_grad()
-        loss_fn = (policy_loss + self.value_loss_coef * value_loss)
+        loss_fn = (policy_loss + self.VALUE_LOSS_COEF * value_loss)
         loss_fn.backward()
+        self.ensure_shared_grads(self.model, shared_agent.get_model())
         self.optimizer.step()
+        torch.save(shared_agent.get_model().state_dict(), 'models/sf2_a3c.pth')

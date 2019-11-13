@@ -1,13 +1,13 @@
 import numpy as np
 
-class Experiences():
 
+class Experiences():
     def __init__(self):
         self.experiences = []
 
-    def add(self, state, reward, agent_action, next_state):
-        self.experiences.append( 
-            (state.tolist(), reward, agent_action, next_state.tolist())
+    def add(self, state, action, reward, next_state):
+        self.experiences.append(
+            (state, action, reward, next_state)
         )
 
     def get(self, batch_size=None):
