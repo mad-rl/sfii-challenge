@@ -39,7 +39,10 @@ class Agent():
         self.rewards = []
 
     def load_model(self, model):
-        self.knowledge.model.load_state_dict(model.state_dict())
+        self.knowledge.load_model(model)
+    
+    def load_model_from_path(self, model_path):
+        self.knowledge.load_model_from_path(model_path)
 
     def get_model(self):
         return self.knowledge.get_model()
