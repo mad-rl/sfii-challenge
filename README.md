@@ -1,5 +1,6 @@
 
-*** WE HAVE MOVED TO https://gitlab.com/mad_rl_ ***
+
+***WE HAVE MOVED TO <https://gitlab.com/mad_rl_>***
 
 
 MAD_RL_ SFII Challenge
